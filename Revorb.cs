@@ -25,9 +25,9 @@ namespace RevorbStd
             return total;
         }
 
-        private static unsafe bool CopyHeaders(Stream fi, ogg_sync_state si, ogg_stream_state @is,
-                                               Stream fo, ogg_sync_state so, ogg_stream_state os,
-                                               vorbis_info vi)
+        private static bool CopyHeaders(Stream fi, ogg_sync_state si, ogg_stream_state @is,
+                                        Stream fo, ogg_sync_state so, ogg_stream_state os,
+                                        vorbis_info vi)
         {
             IntPtr buffer = ogg_sync_buffer(ref si, 4096);
             int numread = fread(buffer, 1, 4096, fi);
@@ -241,8 +241,14 @@ namespace RevorbStd
                 }
                 ogg_stream_clear(ref stream_out);
             }
+            try
+            {
+                vorbis_info_clear(ref vi);
+            }
+            catch
+            {
 
-            vorbis_info_clear(ref vi);
+            }
             ogg_sync_clear(ref sync_in);
             ogg_sync_clear(ref sync_out);
 
