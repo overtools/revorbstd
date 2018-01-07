@@ -1,2 +1,2 @@
 # revorbstd
-revorb-nix rewritten into .NET standard.
+revorb-nix rewritten into .NET
