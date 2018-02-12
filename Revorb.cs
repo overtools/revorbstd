@@ -15,10 +15,11 @@ namespace RevorbStd
             fi.Read(raw, 0, raw.Length);
             fi.Position = pos;
 
-            GCHandle rawHandle = GCHandle.Alloc(raw, GCHandleType.Pinned);
+            IntPtr rawPtr = Marshal.AllocHGlobal(raw.Length);
+            Marshal.Copy(raw, 0, rawPtr, raw.Length);
 
             REVORB_FILE input = new REVORB_FILE {
-                start = rawHandle.AddrOfPinnedObject(),
+                start = rawPtr,
                 size = raw.Length
             };
             input.cursor = input.start;
@@ -34,7 +35,7 @@ namespace RevorbStd
 
             int result = revorb(ref input, ref output);
 
-            rawHandle.Free();
+            Marshal.FreeHGlobal(rawPtr);
 
             if (result != REVORB_ERR_SUCCESS)
             {
@@ -63,16 +64,23 @@ namespace RevorbStd
 
         public static void Main(string[] args)
         {
-            using (Stream file = File.OpenRead(args[0]))
+            try
             {
-                using (Stream data = Jiggle(file))
+                using (Stream file = File.OpenRead(args[0]))
                 {
-                    using (Stream outp = File.OpenWrite(args[1]))
+                    using (Stream data = Jiggle(file))
                     {
-                        data.Position = 0;
-                        data.CopyTo(outp);
+                        using (Stream outp = File.OpenWrite(args[1]))
+                        {
+                            data.Position = 0;
+                            data.CopyTo(outp);
+                        }
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine(e.ToString());
             }
         }
     }

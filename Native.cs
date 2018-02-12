@@ -26,7 +26,7 @@ namespace RevorbStd
         public const int REVORB_ERR_WRITE_FAIL = 10;
         public const int REVORB_ERR_WRITE_FAIL2 = 11;
 
-        [DllImport("librevorb.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "revorb")]
+        [DllImport("librevorb.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int revorb(ref REVORB_FILE fi, ref REVORB_FILE fo);
     }
 }
