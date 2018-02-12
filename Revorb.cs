@@ -32,9 +32,15 @@ namespace RevorbStd
             };
             output.cursor = output.start;
 
-            revorb(ref input, ref output);
+            int result = revorb(ref input, ref output);
 
             rawHandle.Free();
+
+            if (result != REVORB_ERR_SUCCESS)
+            {
+                Marshal.FreeHGlobal(output.start);
+                throw new Exception($"Expected success, got {result} -- refer to RevorbStd.Native");
+            }
 
             return new RevorbStream(output);
         }
