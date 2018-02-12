@@ -22,14 +22,16 @@ namespace RevorbStd
             };
             input.cursor = input.start;
 
-            byte[] empty = new byte[fi.Length];
-            GCHandle emptyHandle = GCHandle.Alloc(empty, GCHandleType.Pinned);
+            IntPtr ptr = Marshal.AllocHGlobal(4096);
+
             REVORB_FILE output = new REVORB_FILE
             {
-                start = emptyHandle.AddrOfPinnedObject(),
-                size = empty.Length
+                start = ptr,
+                size = 4096
             };
             output.cursor = output.start;
+
+            rawHandle.Free();
 
             return new RevorbStream(output);
         }
