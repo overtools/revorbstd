@@ -7,252 +7,47 @@ namespace RevorbStd
 {
     public class Revorb
     {
-        private static int fread(IntPtr buffer, int size, int count, Stream stream)
+        public static RevorbStream Jiggle(Stream fi)
         {
-            int total = size * count;
-            byte[] local = new byte[total];
-            int read = stream.Read(local, 0, total);
-            Marshal.Copy(local, 0, buffer, read);
-            return read;
+            byte[] raw = new byte[fi.Length];
+            long pos = fi.Position;
+            fi.Position = 0;
+            fi.Read(raw, 0, raw.Length);
+
+            GCHandle rawHandle = GCHandle.Alloc(raw, GCHandleType.Pinned);
+
+            REVORB_FILE input = new REVORB_FILE {
+                start = rawHandle.AddrOfPinnedObject(),
+                size = raw.Length
+            };
+            input.cursor = input.start;
+
+            byte[] empty = new byte[fi.Length];
+            GCHandle emptyHandle = GCHandle.Alloc(empty, GCHandleType.Pinned);
+            REVORB_FILE output = new REVORB_FILE
+            {
+                start = emptyHandle.AddrOfPinnedObject(),
+                size = empty.Length
+            };
+            output.cursor = output.start;
+
+            return new RevorbStream(output);
         }
 
-        private static int fwrite(IntPtr buffer, int size, int count, Stream stream)
+        public unsafe class RevorbStream : UnmanagedMemoryStream
         {
-            int total = size * count;
-            byte[] local = new byte[total];
-            Marshal.Copy(buffer, local, 0, total);
-            stream.Write(local, 0, total);
-            return total;
-        }
+            private REVORB_FILE revorb;
 
-        private static bool CopyHeaders(Stream fi, ogg_sync_state si, ogg_stream_state @is,
-                                        Stream fo, ogg_sync_state so, ogg_stream_state os,
-                                        vorbis_info vi)
-        {
-            IntPtr buffer = ogg_sync_buffer(ref si, 4096);
-            int numread = fread(buffer, 1, 4096, fi);
-            ogg_sync_wrote(ref si, numread);
-
-            ogg_page page = new ogg_page { };
-            if (ogg_sync_pageout(ref si, ref page) != 1)
+            public RevorbStream(REVORB_FILE revorb) : base((byte*)revorb.start.ToPointer(), revorb.size)
             {
-                return false;
+                this.revorb = revorb;
             }
-
-            ogg_stream_init(ref @is, ogg_page_serialno(ref page));
-            ogg_stream_init(ref @os, ogg_page_serialno(ref page));
-
-            if (ogg_stream_pagein(ref @is, ref page) < 0)
+            
+            public new void Dispose()
             {
-                ogg_stream_clear(ref @is);
-                ogg_stream_clear(ref os);
-                return false;
+                base.Dispose();
+                Marshal.FreeHGlobal(revorb.start);
             }
-
-            ogg_packet packet = new ogg_packet { };
-            if (ogg_stream_packetout(ref @is, ref packet) != 1)
-            {
-                ogg_stream_clear(ref @is);
-                ogg_stream_clear(ref os);
-                return false;
-            }
-
-            vorbis_comment vc = new vorbis_comment { };
-            vorbis_comment_init(ref vc);
-            if (vorbis_synthesis_headerin(ref vi, ref vc, ref packet) < 0)
-            {
-                vorbis_comment_clear(ref vc);
-                ogg_stream_clear(ref @is);
-                ogg_stream_clear(ref os);
-                return false;
-            }
-
-            ogg_stream_packetin(ref os, ref packet);
-
-            int i = 0;
-            while (i < 2)
-            {
-                int res = ogg_sync_pageout(ref si, ref page);
-
-                if (res == 0)
-                {
-                    buffer = ogg_sync_buffer(ref si, 4096);
-                    numread = fread(buffer, 1, 4096, fi);
-                    if (numread == 0 && i < 2)
-                    {
-                        vorbis_comment_clear(ref vc);
-                        ogg_stream_clear(ref @is);
-                        ogg_stream_clear(ref os);
-                        return false;
-                    }
-
-                    ogg_sync_wrote(ref si, numread);
-                    continue;
-                }
-
-                if (res == 1)
-                {
-                    ogg_stream_pagein(ref @is, ref page);
-                    while (i < 2)
-                    {
-                        res = ogg_stream_packetout(ref @is, ref packet);
-                        if (res == 0)
-                        {
-                            break;
-                        }
-                        if (res < 0)
-                        {
-                            vorbis_comment_clear(ref vc);
-                            ogg_stream_clear(ref @is);
-                            ogg_stream_clear(ref os);
-                            return false;
-                        }
-                        vorbis_synthesis_headerin(ref vi, ref vc, ref packet);
-                        ogg_stream_packetin(ref os, ref packet);
-                        i++;
-                    }
-                }
-            }
-
-            vorbis_comment_clear(ref vc);
-
-            while (ogg_stream_flush(ref os, ref page) != 0)
-            {
-                if (fwrite(page.header, 1, page.header_len, fo) != page.header_len || fwrite(page.body, 1, page.body_len, fo) != page.body_len)
-                {
-                    ogg_stream_clear(ref @is);
-                    ogg_stream_clear(ref os);
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static MemoryStream Jiggle(Stream fi)
-        {
-            MemoryStream fo = new MemoryStream();
-
-            ogg_sync_state sync_in = new ogg_sync_state { };
-            ogg_sync_state sync_out = new ogg_sync_state { };
-
-            ogg_sync_init(ref sync_in);
-            ogg_sync_init(ref sync_out);
-
-            ogg_stream_state stream_in = new ogg_stream_state { };
-            ogg_stream_state stream_out = new ogg_stream_state { };
-            vorbis_info vi = new vorbis_info { };
-            vorbis_info_init(ref vi);
-
-            ogg_packet packet = new ogg_packet { };
-            ogg_page page = new ogg_page { };
-            if (CopyHeaders(fi, sync_in, stream_in, fo, sync_out, stream_out, vi))
-            {
-                long granpos = 0;
-                long packetnum = 0;
-                int lastbs = 0;
-                while (true)
-                {
-                    int eos = 0;
-                    while (eos == 0)
-                    {
-                        int res = ogg_sync_pageout(ref sync_in, ref page);
-                        if (res == 0)
-                        {
-                            IntPtr buffer = ogg_sync_buffer(ref sync_in, 4096);
-                            int numread = fread(buffer, 1, 4096, fi);
-                            if (numread > 0)
-                            {
-                                ogg_sync_wrote(ref sync_in, numread);
-                            }
-                            else
-                            {
-                                eos = 2;
-                            }
-                            continue;
-                        }
-
-                        if (res < 0)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            if (ogg_page_eos(ref page) == 1)
-                            {
-                                eos = 1;
-                            }
-                            ogg_stream_pagein(ref stream_in, ref page);
-                            while (true)
-                            {
-                                res = ogg_stream_packetout(ref stream_in, ref packet);
-                                if (res == 0)
-                                {
-                                    break;
-                                }
-                                if (res < 0)
-                                {
-                                    continue;
-                                }
-                                int bs = vorbis_packet_blocksize(ref vi, ref packet);
-                                if (lastbs > 0)
-                                {
-                                    granpos += (lastbs * bs) / 4;
-                                }
-                                lastbs = bs;
-
-                                packet.granulepos = granpos;
-                                packet.packetno = packetnum++;
-                                if (packet.e_o_s == 0)
-                                {
-                                    ogg_stream_packetin(ref stream_out, ref packet);
-                                    ogg_page opage = new ogg_page { };
-                                    while (ogg_stream_pageout(ref stream_out, ref page) != 0)
-                                    {
-                                        if (fwrite(opage.header, 1, opage.header_len, fo) != opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != opage.body_len)
-                                        {
-                                            eos = 2;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (eos == 2)
-                    {
-                        break;
-                    }
-
-                    {
-                        packet.e_o_s = 1;
-                        ogg_stream_packetin(ref stream_out, ref packet);
-                        ogg_page opage = new ogg_page { };
-                        while (ogg_stream_flush(ref stream_out, ref opage) != 0)
-                        {
-                            if (fwrite(opage.header, 1, opage.header_len, fo) != opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != opage.body_len)
-                            {
-                                break;
-                            }
-                        }
-                        ogg_stream_clear(ref stream_in);
-                        break;
-                    }
-                }
-                ogg_stream_clear(ref stream_out);
-            }
-            try
-            {
-                vorbis_info_clear(ref vi);
-            }
-            catch
-            {
-
-            }
-            ogg_sync_clear(ref sync_in);
-            ogg_sync_clear(ref sync_out);
-
-            return fo;
         }
 
         public static void Main(string[] args)
