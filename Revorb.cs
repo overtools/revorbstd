@@ -13,6 +13,7 @@ namespace RevorbStd
             long pos = fi.Position;
             fi.Position = 0;
             fi.Read(raw, 0, raw.Length);
+            fi.Position = pos;
 
             GCHandle rawHandle = GCHandle.Alloc(raw, GCHandleType.Pinned);
 
