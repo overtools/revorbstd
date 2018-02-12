@@ -32,6 +32,8 @@ namespace RevorbStd
             };
             output.cursor = output.start;
 
+            revorb(ref input, ref output);
+
             rawHandle.Free();
 
             return new RevorbStream(output);
@@ -39,17 +41,17 @@ namespace RevorbStd
 
         public unsafe class RevorbStream : UnmanagedMemoryStream
         {
-            private REVORB_FILE revorb;
+            private REVORB_FILE revorbFile;
 
-            public RevorbStream(REVORB_FILE revorb) : base((byte*)revorb.start.ToPointer(), revorb.size)
+            public RevorbStream(REVORB_FILE revorbFile) : base((byte*)revorbFile.start.ToPointer(), revorbFile.size)
             {
-                this.revorb = revorb;
+                this.revorbFile = revorbFile;
             }
             
             public new void Dispose()
             {
                 base.Dispose();
-                Marshal.FreeHGlobal(revorb.start);
+                Marshal.FreeHGlobal(revorbFile.start);
             }
         }
 
