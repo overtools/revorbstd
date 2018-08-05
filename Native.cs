@@ -10,7 +10,7 @@ namespace RevorbStd
         {
             public IntPtr start;
             public IntPtr cursor;
-            public int size;
+            public long size;
         }
 
         public const int REVORB_ERR_SUCCESS = 0;
