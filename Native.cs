@@ -1,10 +1,34 @@
 ﻿using System;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace RevorbStd
 {
     public class Native
     {
+
+        //required for hassle-free native lib loading on linux (without it user must have .so
+        //libs installed in /libs/ or datatool path defined in LD_LIBRARY_PATH env var)
+        private static IntPtr SharedLibraryResolver(string libraryName, Assembly assembly,DllImportSearchPath? p)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return NativeLibrary.Load("librevorb.dll", assembly, DllImportSearchPath.AssemblyDirectory);
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                return NativeLibrary.Load("./librevorb.so", assembly, DllImportSearchPath.AssemblyDirectory);
+            else
+            {
+                Console.WriteLine("Current platform doesn't support librevorb. Sound conversion to .ogg is not available.");
+                return IntPtr.Zero;
+            }
+        }
+
+        [ModuleInitializer]
+        public static void LibInit()
+        {
+            NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(), SharedLibraryResolver);
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         public struct REVORB_FILE
         {
@@ -26,7 +50,7 @@ namespace RevorbStd
         public const int REVORB_ERR_WRITE_FAIL = 10;
         public const int REVORB_ERR_WRITE_FAIL2 = 11;
 
-        [DllImport("librevorb.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("librevorb", CallingConvention = CallingConvention.Cdecl)]
         public static extern int revorb(ref REVORB_FILE fi, ref REVORB_FILE fo);
     }
 }
