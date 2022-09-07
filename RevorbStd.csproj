@@ -10,9 +10,6 @@
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="lz4net" Version="1.0.15.93" />
-  </ItemGroup>
-  <ItemGroup>
     <None Update="librevorb.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
