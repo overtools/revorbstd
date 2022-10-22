@@ -7,44 +7,45 @@ namespace RevorbStd
 {
     public class Revorb
     {
-        public static RevorbStream Jiggle(Stream fi)
+        public static unsafe RevorbStream Jiggle(Stream fi)
         {
             byte[] raw = new byte[fi.Length];
-            IntPtr rawPtr = Marshal.AllocHGlobal(raw.Length);
+            long pos = fi.Position;
+            fi.Position = 0;
+            fi.Read(raw, 0, raw.Length);
+            fi.Position = pos;
             IntPtr ptr = Marshal.AllocHGlobal(4096);
 
+            REVORB_FILE output = new REVORB_FILE {
+                start = ptr,
+                size = 4096
+            };
             try {
-                long pos = fi.Position;
-                fi.Position = 0;
-                fi.Read(raw, 0, raw.Length);
-                fi.Position = pos;
-                Marshal.Copy(raw, 0, rawPtr, raw.Length);
+                fixed (byte* rawPtr = raw) {
+                    REVORB_FILE input = new REVORB_FILE {
+                        start = (IntPtr) rawPtr,
+                        size = raw.Length
+                    };
 
-                REVORB_FILE input = new REVORB_FILE {
-                    start = rawPtr,
-                    size = raw.Length
-                };
+                    input.cursor = input.start;
 
-                input.cursor = input.start;
+                    output.cursor = output.start;
 
-                REVORB_FILE output = new REVORB_FILE {
-                    start = ptr,
-                    size = 4096
-                };
+                    int result = revorb(ref input, ref output);
 
-                output.cursor = output.start;
+                    if (result != REVORB_ERR_SUCCESS) {
+                        throw new Exception($"Expected success, got {result} -- refer to RevorbStd.Native");
+                    }
 
-                int result = revorb(ref input, ref output);
-
-                if (result != REVORB_ERR_SUCCESS) {
+                    return new RevorbStream(output);
+                }
+            } catch {
+                if (output.start != IntPtr.Zero) {
                     Marshal.FreeHGlobal(output.start);
-                    throw new Exception($"Expected success, got {result} -- refer to RevorbStd.Native");
+                    output.start = IntPtr.Zero;
                 }
 
-                return new RevorbStream(output);
-            } finally {
-                Marshal.FreeHGlobal(rawPtr);
-                Marshal.FreeHGlobal(ptr);
+                throw;
             }
         }
 
@@ -57,9 +58,8 @@ namespace RevorbStd
                 this.revorbFile = revorbFile;
             }
 
-            public new void Dispose()
-            {
-                base.Dispose();
+            public override void Close() {
+                base.Close();
                 Marshal.FreeHGlobal(revorbFile.start);
             }
         }
