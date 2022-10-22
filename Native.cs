@@ -3,35 +3,28 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace RevorbStd
-{
-    public class Native
-    {
-
+namespace RevorbStd {
+    public class Native {
         //required for hassle-free native lib loading on linux (without it user must have .so
         //libs installed in /libs/ or datatool path defined in LD_LIBRARY_PATH env var)
-        private static IntPtr SharedLibraryResolver(string libraryName, Assembly assembly,DllImportSearchPath? p)
-        {
+        private static IntPtr SharedLibraryResolver(string libraryName, Assembly assembly, DllImportSearchPath? p) {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return NativeLibrary.Load("librevorb.dll", assembly, DllImportSearchPath.AssemblyDirectory);
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 return NativeLibrary.Load("./librevorb.so", assembly, DllImportSearchPath.AssemblyDirectory);
-            else
-            {
-                Console.WriteLine("Current platform doesn't support librevorb. Sound conversion to .ogg is not available.");
-                return IntPtr.Zero;
-            }
+
+            Console.WriteLine("Current platform doesn't support librevorb. Sound conversion to .ogg is not available.");
+            return IntPtr.Zero;
         }
 
         [ModuleInitializer]
-        public static void LibInit()
-        {
+        public static void LibInit() {
             NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(), SharedLibraryResolver);
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct REVORB_FILE
-        {
+        public struct REVORB_FILE {
             public IntPtr start;
             public IntPtr cursor;
             public long size;

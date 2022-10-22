@@ -3,12 +3,9 @@ using System.IO;
 using System.Runtime.InteropServices;
 using static RevorbStd.Native;
 
-namespace RevorbStd
-{
-    public class Revorb
-    {
-        public static unsafe RevorbStream Jiggle(Stream fi)
-        {
+namespace RevorbStd {
+    public class Revorb {
+        public static unsafe RevorbStream Jiggle(Stream fi) {
             byte[] raw = new byte[fi.Length];
             long pos = fi.Position;
             fi.Position = 0;
@@ -20,6 +17,7 @@ namespace RevorbStd
                 start = ptr,
                 size = 4096
             };
+
             try {
                 fixed (byte* rawPtr = raw) {
                     REVORB_FILE input = new REVORB_FILE {
@@ -49,12 +47,10 @@ namespace RevorbStd
             }
         }
 
-        public unsafe class RevorbStream : UnmanagedMemoryStream
-        {
+        public unsafe class RevorbStream : UnmanagedMemoryStream {
             private REVORB_FILE revorbFile;
 
-            public RevorbStream(REVORB_FILE revorbFile) : base((byte*)revorbFile.start.ToPointer(), revorbFile.size)
-            {
+            public RevorbStream(REVORB_FILE revorbFile) : base((byte*) revorbFile.start.ToPointer(), revorbFile.size) {
                 this.revorbFile = revorbFile;
             }
 
@@ -64,26 +60,16 @@ namespace RevorbStd
             }
         }
 
-        public static void Main(string[] args)
-        {
-            try
-            {
-                using (Stream file = File.OpenRead(args[0]))
-                {
-                    using (Stream data = Jiggle(file))
-                    {
-                        using (Stream outp = File.OpenWrite(args[1]))
-                        {
-                            data.Position = 0;
-                            data.CopyTo(outp);
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Console.Error.WriteLine(e.ToString());
-            }
-        }
+        // public static void Main(string[] args) {
+        //     try {
+        //         using Stream file = File.OpenRead(args[0]);
+        //         using Stream data = Jiggle(file);
+        //         using Stream outp = File.OpenWrite(args[1]);
+        //         data.Position = 0;
+        //         data.CopyTo(outp);
+        //     } catch (Exception e) {
+        //         Console.Error.WriteLine(e.ToString());
+        //     }
+        // }
     }
 }
