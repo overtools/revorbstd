@@ -10,40 +10,42 @@ namespace RevorbStd
         public static RevorbStream Jiggle(Stream fi)
         {
             byte[] raw = new byte[fi.Length];
-            long pos = fi.Position;
-            fi.Position = 0;
-            fi.Read(raw, 0, raw.Length);
-            fi.Position = pos;
-
             IntPtr rawPtr = Marshal.AllocHGlobal(raw.Length);
-            Marshal.Copy(raw, 0, rawPtr, raw.Length);
-
-            REVORB_FILE input = new REVORB_FILE {
-                start = rawPtr,
-                size = raw.Length
-            };
-            input.cursor = input.start;
-
             IntPtr ptr = Marshal.AllocHGlobal(4096);
 
-            REVORB_FILE output = new REVORB_FILE
-            {
-                start = ptr,
-                size = 4096
-            };
-            output.cursor = output.start;
+            try {
+                long pos = fi.Position;
+                fi.Position = 0;
+                fi.Read(raw, 0, raw.Length);
+                fi.Position = pos;
+                Marshal.Copy(raw, 0, rawPtr, raw.Length);
 
-            int result = revorb(ref input, ref output);
+                REVORB_FILE input = new REVORB_FILE {
+                    start = rawPtr,
+                    size = raw.Length
+                };
 
-            Marshal.FreeHGlobal(rawPtr);
+                input.cursor = input.start;
 
-            if (result != REVORB_ERR_SUCCESS)
-            {
-                Marshal.FreeHGlobal(output.start);
-                throw new Exception($"Expected success, got {result} -- refer to RevorbStd.Native");
+                REVORB_FILE output = new REVORB_FILE {
+                    start = ptr,
+                    size = 4096
+                };
+
+                output.cursor = output.start;
+
+                int result = revorb(ref input, ref output);
+
+                if (result != REVORB_ERR_SUCCESS) {
+                    Marshal.FreeHGlobal(output.start);
+                    throw new Exception($"Expected success, got {result} -- refer to RevorbStd.Native");
+                }
+
+                return new RevorbStream(output);
+            } finally {
+                Marshal.FreeHGlobal(rawPtr);
+                Marshal.FreeHGlobal(ptr);
             }
-
-            return new RevorbStream(output);
         }
 
         public unsafe class RevorbStream : UnmanagedMemoryStream
@@ -54,7 +56,7 @@ namespace RevorbStd
             {
                 this.revorbFile = revorbFile;
             }
-            
+
             public new void Dispose()
             {
                 base.Dispose();
